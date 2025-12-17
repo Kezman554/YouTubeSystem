@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+lancedb
+sentence-transformers
+anthropic
+youtube-transcript-api
+streamlit
+python-dotenv
+pydantic
