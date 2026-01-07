@@ -8,3 +8,4 @@ streamlit
 python-dotenv
 pydantic
 pytest
+requests
