@@ -31,11 +31,13 @@ def main():
         print("2. Added your YOUTUBE_API_KEY to .env")
         return
 
-    # Test with "In Deep Geek" - a popular LOTR/Fantasy lore channel
-    # Channel ID: UCU2-lkA7umT96fkcC2672DA
-    channel_id = "UCU2-lkA7umT96fkcC2672DA"
+    # Test with "Google for Developers" - using a known valid channel
+    # Replace this with any LOTR channel ID you want to test
+    # Channel ID: UC_x5XG1OV2P6uZZ5FSM9Ttw
+    channel_id = "UC_x5XG1OV2P6uZZ5FSM9Ttw"
 
-    print("Testing with 'In Deep Geek' channel (LOTR/Fantasy lore)")
+    print("Testing with 'Google for Developers' channel")
+    print("(Replace with any channel ID you want to scrape)")
     print(f"Channel ID: {channel_id}")
     print()
     print("NOTE: If this fails, make sure:")
@@ -83,7 +85,9 @@ def main():
         for i, video in enumerate(videos, 1):
             duration_min = video['duration'] // 60
             duration_sec = video['duration'] % 60
-            print(f"{i}. {video['title']}")
+            # Handle encoding issues with emojis in titles
+            title = video['title'].encode('ascii', 'ignore').decode('ascii')
+            print(f"{i}. {title}")
             print(f"   ID: {video['video_id']}")
             print(f"   Views: {video['view_count']:,}")
             print(f"   Likes: {video['like_count']:,}")
