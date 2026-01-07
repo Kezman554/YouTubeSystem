@@ -1,19 +1,13 @@
 """
 YouTube scraper for competitor research.
 
-Fetches channel info, video metadata, transcripts, and thumbnails.
+Fetches channel info, video metadata, and thumbnails.
 """
 
 import time
 import requests
 from typing import Optional
 from pathlib import Path
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import (
-    TranscriptsDisabled,
-    NoTranscriptFound,
-    VideoUnavailable
-)
 
 from src.config import config
 
@@ -278,31 +272,15 @@ class YouTubeScraper:
             video_id: YouTube video ID
 
         Returns:
-            Transcript text, or None if unavailable
+            None - transcript fetching is currently disabled
 
         Note:
-            Returns None if:
-            - Video has no captions/transcripts
-            - Transcripts are disabled
-            - Video is unavailable
+            TODO: Implement transcript fetching when YouTube API access is resolved.
+            YouTube has blocked unauthenticated transcript requests.
+            For now, transcripts will be gathered manually.
         """
-        self._rate_limit()
-
-        try:
-            def _fetch():
-                api = YouTubeTranscriptApi()
-                transcript = api.fetch(video_id)
-                # transcript is a FetchedTranscript object with snippets
-                return ' '.join([snippet['text'] for snippet in transcript])
-
-            return self._retry_with_backoff(_fetch, max_retries=2)
-
-        except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable):
-            # Expected cases where transcript is unavailable
-            return None
-        except Exception:
-            # Unexpected errors - also return None but could log
-            return None
+        # Transcript fetching disabled - YouTube blocks unauthenticated requests
+        return None
 
     def download_thumbnail(
         self,
