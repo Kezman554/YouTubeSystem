@@ -405,7 +405,7 @@ def update_competitor_video(
         "channel_id", "niche_id", "youtube_id", "title", "description",
         "published_at", "duration_seconds", "view_count", "like_count",
         "comment_count", "thumbnail_url", "thumbnail_path", "views_per_sub",
-        "topic_tags", "has_transcript", "transcript_cleaned"
+        "topic_tags", "has_transcript", "transcript_cleaned", "transcript"
     }
     provided_fields = set(fields.keys())
 
