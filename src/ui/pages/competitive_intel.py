@@ -17,6 +17,51 @@ from src.database.competitor_videos import (
     get_videos_by_niche, get_videos_by_channel, get_competitor_video,
     update_competitor_video
 )
+from src.pipeline.chunk import chunk_text
+from src.pipeline.embed import embed_batch
+from src.pipeline.vectorstore import get_db, store_transcript_chunks
+
+
+def embed_transcript(video: dict, transcript: str, channel_name: str) -> bool:
+    """Chunk and embed a transcript into LanceDB for semantic search.
+
+    Args:
+        video: Video dict with id, channel_id, niche_id, title, published_at, view_count.
+        transcript: The raw transcript text.
+        channel_name: Name of the channel.
+
+    Returns:
+        True if embedding succeeded, False otherwise.
+    """
+    try:
+        # Chunk the transcript
+        text_chunks = chunk_text(transcript, chunk_size=2000, overlap=200)
+        if not text_chunks:
+            return False
+
+        chunk_dicts = [{"text": t, "chunk_index": i} for i, t in enumerate(text_chunks)]
+
+        # Embed all chunks
+        vectors = embed_batch([c["text"] for c in chunk_dicts], batch_size=32)
+
+        # Store in LanceDB
+        db = get_db()
+        store_transcript_chunks(
+            chunks=chunk_dicts,
+            video_id=video['id'],
+            niche_id=video['niche_id'],
+            channel_id=video['channel_id'],
+            vectors=vectors,
+            video_title=video['title'],
+            channel_name=channel_name,
+            published_at=video.get('published_at') or "",
+            view_count=video.get('view_count') or 0,
+            db=db
+        )
+        return True
+    except Exception as e:
+        st.error(f"Embedding failed: {e}")
+        return False
 
 
 def render_videos_tab(niche_id: int):
@@ -198,6 +243,11 @@ def render_videos_tab(niche_id: int):
                     if st.button("Update Transcript", key=f"update_transcript_{video['id']}"):
                         update_competitor_video(video['id'], transcript=edited_transcript, has_transcript=True)
                         st.success("Transcript updated!")
+                        with st.spinner("Re-embedding transcript for search..."):
+                            if embed_transcript(video, edited_transcript, channel_name):
+                                st.success("✅ Transcript re-embedded and searchable!")
+                            else:
+                                st.warning("Transcript saved but embedding failed. Run embed_transcripts.py manually.")
                         st.rerun()
             else:
                 st.warning("❌ No transcript yet")
@@ -218,6 +268,11 @@ def render_videos_tab(niche_id: int):
                             has_transcript=True
                         )
                         st.success("✅ Transcript saved!")
+                        with st.spinner("Embedding transcript for search..."):
+                            if embed_transcript(video, transcript_input.strip(), channel_name):
+                                st.success("✅ Transcript embedded and searchable!")
+                            else:
+                                st.warning("Transcript saved but embedding failed. Run embed_transcripts.py manually.")
                         st.rerun()
                     else:
                         st.error("Please enter a transcript before saving.")
