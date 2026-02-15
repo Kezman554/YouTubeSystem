@@ -18,6 +18,10 @@ from src.database.competitor_channels import (
     get_channels_by_niche, create_competitor_channel, update_competitor_channel,
     delete_competitor_channel, mark_as_scraped, get_competitor_channel_by_youtube_id
 )
+from src.pipeline.ingest import extract_pdf
+from src.pipeline.chunk import chunk_with_metadata
+from src.pipeline.embed import embed_batch
+from src.pipeline.vectorstore import get_db, store_canon_chunks
 from src.database.glossary import (
     get_glossary_by_niche, create_glossary_entry, delete_glossary_entry,
     update_glossary_entry
@@ -141,6 +145,41 @@ def render_niches_tab():
                             st.error(f"Error deleting niche: {e}")
 
 
+def _ingest_source(source_id: int, file_path: str, niche_id: int, title: str) -> tuple:
+    """Extract, chunk, embed, and store a canon source PDF.
+
+    Returns:
+        (success: bool, chunk_count: int, error_msg: str)
+    """
+    try:
+        full_text, metadata = extract_pdf(file_path)
+        if not full_text.strip():
+            return False, 0, "PDF contained no extractable text."
+
+        chunks = chunk_with_metadata(
+            full_text, chunk_size=2000, overlap=200, source_id=source_id
+        )
+        if not chunks:
+            return False, 0, "No chunks created from PDF text."
+
+        vectors = embed_batch([c["text"] for c in chunks], batch_size=32)
+
+        db = get_db()
+        store_canon_chunks(
+            chunks=chunks,
+            niche_id=niche_id,
+            source_id=source_id,
+            vectors=vectors,
+            chapter=title,
+            db=db
+        )
+
+        mark_as_ingested(source_id)
+        return True, len(chunks), ""
+    except Exception as e:
+        return False, 0, str(e)
+
+
 def render_canon_sources_tab():
     """Render the Canon Sources tab."""
     st.subheader("Manage Canon Sources")
@@ -157,7 +196,14 @@ def render_canon_sources_tab():
 
     # Add new source section
     with st.expander("➕ Add New Canon Source", expanded=False):
-        st.write("Upload a PDF file or link an existing file")
+        st.write("Upload a PDF file or link an existing file on disk.")
+
+        # File uploader (outside form — Streamlit limitation)
+        uploaded_file = st.file_uploader(
+            "Upload PDF",
+            type=["pdf"],
+            key="canon_pdf_upload"
+        )
 
         with st.form("add_source_form"):
             title = st.text_input("Title*", placeholder="e.g., The Hobbit")
@@ -170,7 +216,10 @@ def render_canon_sources_tab():
                 priority = st.slider("Priority", 1, 10, 5, help="Higher = more authoritative")
 
             with col2:
-                file_path = st.text_input("File Path", placeholder="/path/to/file.pdf")
+                file_path = st.text_input(
+                    "File Path (or use uploader above)",
+                    placeholder="/path/to/file.pdf"
+                )
                 url = st.text_input("URL (optional)", placeholder="https://...")
 
             submitted = st.form_submit_button("Add Canon Source")
@@ -178,20 +227,42 @@ def render_canon_sources_tab():
             if submitted:
                 if not title:
                     st.error("Title is required")
-                elif not file_path:
-                    st.error("File path is required")
+                elif not uploaded_file and not file_path:
+                    st.error("Please upload a PDF or provide a file path.")
                 else:
                     try:
+                        # If PDF uploaded, save it to data/sources/{niche-slug}/
+                        saved_path = file_path
+                        if uploaded_file:
+                            niche = get_niche(current_niche)
+                            sources_dir = Path("data/sources") / niche['slug']
+                            sources_dir.mkdir(parents=True, exist_ok=True)
+                            saved_path = str(sources_dir / uploaded_file.name)
+                            with open(saved_path, "wb") as f:
+                                f.write(uploaded_file.getbuffer())
+
                         source_id = create_canon_source(
                             niche_id=current_niche,
                             title=title,
                             author=author if author else None,
                             source_type=source_type,
-                            file_path=file_path,
+                            file_path=saved_path,
                             url=url if url else None,
                             priority=priority
                         )
                         st.success(f"✅ Added canon source: {title} (ID: {source_id})")
+
+                        # Auto-ingest if it's a PDF
+                        if saved_path and saved_path.lower().endswith(".pdf"):
+                            with st.spinner("Extracting, chunking, and embedding PDF..."):
+                                ok, count, err = _ingest_source(
+                                    source_id, saved_path, current_niche, title
+                                )
+                            if ok:
+                                st.success(f"✅ Ingested! {count} chunks embedded and searchable.")
+                            else:
+                                st.warning(f"Source saved but ingestion failed: {err}")
+
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error adding source: {e}")
@@ -254,8 +325,16 @@ def render_canon_sources_tab():
                 with col1:
                     if not source['ingested']:
                         if st.button("🚀 Trigger Ingestion", key=f"ingest_{source['id']}"):
-                            st.info("Ingestion would be triggered here (run chunking script)")
-                            st.code("python scripts/test_chunking.py")
+                            with st.spinner("Extracting, chunking, and embedding..."):
+                                ok, count, err = _ingest_source(
+                                    source['id'], source['file_path'],
+                                    current_niche, source['title']
+                                )
+                            if ok:
+                                st.success(f"✅ Ingested! {count} chunks embedded.")
+                                st.rerun()
+                            else:
+                                st.error(f"Ingestion failed: {err}")
 
                 with col2:
                     if st.button("🗑️ Delete Source", key=f"delete_source_{source['id']}"):
@@ -269,7 +348,16 @@ def render_canon_sources_tab():
                 with col3:
                     if source['ingested']:
                         if st.button("🔄 Re-ingest", key=f"reingest_{source['id']}"):
-                            st.info("Re-ingestion would be triggered here")
+                            with st.spinner("Re-ingesting..."):
+                                ok, count, err = _ingest_source(
+                                    source['id'], source['file_path'],
+                                    current_niche, source['title']
+                                )
+                            if ok:
+                                st.success(f"✅ Re-ingested! {count} chunks embedded.")
+                                st.rerun()
+                            else:
+                                st.error(f"Re-ingestion failed: {err}")
 
 
 def render_competitors_tab():
