@@ -480,11 +480,11 @@ def render():
     st.title("🔍 Competitive Intelligence")
 
     # Check if niche is selected
-    if 'selected_niche_id' not in st.session_state or not st.session_state.selected_niche_id:
+    if not st.session_state.get('current_niche'):
         st.warning("⚠️ Please select a niche from the sidebar first.")
         return
 
-    niche_id = st.session_state.selected_niche_id
+    niche_id = st.session_state.current_niche
     niche = get_niche(niche_id)
 
     if not niche:

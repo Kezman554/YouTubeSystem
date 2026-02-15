@@ -25,9 +25,15 @@ st.set_page_config(
 
 
 def init_session_state():
-    """Initialize session state variables."""
+    """Initialize session state variables, restoring from URL query params if present."""
+    params = st.query_params
+
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = params.get("page", "Home")
+
     if 'current_niche' not in st.session_state:
-        st.session_state.current_niche = None
+        niche_param = params.get("niche")
+        st.session_state.current_niche = int(niche_param) if niche_param else None
 
     if 'selected_video' not in st.session_state:
         st.session_state.selected_video = None
@@ -35,8 +41,19 @@ def init_session_state():
     if 'research_context' not in st.session_state:
         st.session_state.research_context = []
 
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = "Home"
+
+def _sync_query_params():
+    """Sync current session state to URL query params for persistence across refreshes."""
+    params = {}
+    if st.session_state.current_page and st.session_state.current_page != "Home":
+        params["page"] = st.session_state.current_page
+    if st.session_state.current_niche is not None:
+        params["niche"] = str(st.session_state.current_niche)
+    st.query_params.update(params)
+    # Clear params that are no longer set
+    for key in list(st.query_params.keys()):
+        if key not in params:
+            del st.query_params[key]
 
 
 def render_sidebar():
@@ -161,6 +178,9 @@ def main():
 
     # Render sidebar
     render_sidebar()
+
+    # Sync state to URL so refresh preserves page + niche
+    _sync_query_params()
 
     # Route to selected page
     route_to_page()

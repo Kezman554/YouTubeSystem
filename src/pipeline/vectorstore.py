@@ -140,6 +140,74 @@ def store_canon_chunks(
     return len(records)
 
 
+def store_transcript_chunks(
+    chunks: List[dict],
+    video_id: int,
+    niche_id: int,
+    channel_id: int,
+    vectors: List[List[float]],
+    video_title: str = "",
+    channel_name: str = "",
+    published_at: str = "",
+    view_count: int = 0,
+    db=None
+) -> int:
+    """
+    Store transcript chunks with embeddings in LanceDB.
+
+    Args:
+        chunks: List of chunk dicts with 'text' and 'chunk_index'
+        video_id: SQLite competitor_videos ID
+        niche_id: SQLite niches ID
+        channel_id: SQLite competitor_channels ID
+        vectors: Embedding vectors (one per chunk)
+        video_title: Denormalized video title for display
+        channel_name: Denormalized channel name for display
+        published_at: ISO timestamp of video publication
+        view_count: Video view count at scrape time
+        db: LanceDB connection (optional)
+
+    Returns:
+        Number of chunks stored
+    """
+    if len(chunks) != len(vectors):
+        raise ValueError(f"Chunks ({len(chunks)}) and vectors ({len(vectors)}) must have same length")
+
+    if not chunks:
+        return 0
+
+    if db is None:
+        db = get_db()
+
+    records = []
+    for chunk, vector in zip(chunks, vectors):
+        record = {
+            "id": str(uuid.uuid4()),
+            "video_id": video_id,
+            "niche_id": niche_id,
+            "channel_id": channel_id,
+            "text": chunk["text"],
+            "chunk_index": chunk["chunk_index"],
+            "timestamp_start": 0.0,   # TODO: parse from transcript format
+            "timestamp_end": 0.0,     # TODO: parse from transcript format
+            "video_title": video_title,
+            "channel_name": channel_name,
+            "published_at": published_at or "",
+            "view_count": view_count or 0,
+            "topics": [],  # TODO: extract with LLM
+            "vector": vector
+        }
+        records.append(record)
+
+    try:
+        table = db.open_table("transcript_chunks")
+        table.add(records)
+    except Exception:
+        table = db.create_table("transcript_chunks", data=records)
+
+    return len(records)
+
+
 def search_canon(
     query: str,
     query_vector: List[float],
@@ -220,7 +288,7 @@ def get_stats(db=None) -> dict:
                 "count": count
             })
 
-            if name == "canon_passages":
+            if name in ("canon_passages", "transcript_chunks"):
                 stats["total_chunks"] += count
 
     except Exception as e:
