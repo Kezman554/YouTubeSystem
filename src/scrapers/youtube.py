@@ -220,7 +220,7 @@ class YouTubeScraper:
                 content_details = item["contentDetails"]
 
                 # Parse ISO 8601 duration (PT1H2M10S -> seconds)
-                duration = self._parse_duration(content_details["duration"])
+                duration = self._parse_duration(content_details.get("duration", "PT0S"))
 
                 videos.append({
                     "video_id": item["id"],

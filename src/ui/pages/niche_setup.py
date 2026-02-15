@@ -18,6 +18,8 @@ from src.database.competitor_channels import (
     get_channels_by_niche, create_competitor_channel, update_competitor_channel,
     delete_competitor_channel, mark_as_scraped, get_competitor_channel_by_youtube_id
 )
+from src.scrapers.youtube import get_channel_videos as scrape_channel_videos, get_channel_info as scrape_channel_info
+from src.database.competitor_videos import create_competitor_video, get_videos_by_channel
 from src.pipeline.ingest import extract_pdf
 from src.pipeline.chunk import chunk_with_metadata
 from src.pipeline.embed import embed_batch
@@ -360,6 +362,69 @@ def render_canon_sources_tab():
                                 st.error(f"Re-ingestion failed: {err}")
 
 
+def _scrape_channel(channel: dict, niche_id: int, max_results: int, skip_existing: bool) -> tuple[int, int]:
+    """
+    Scrape videos from a competitor channel and save to database.
+
+    Args:
+        channel: Channel dict with 'id', 'youtube_id', etc.
+        niche_id: Niche ID to associate videos with.
+        max_results: Maximum number of videos to fetch.
+        skip_existing: If True, skip videos already in the database.
+
+    Returns:
+        Tuple of (total_fetched, newly_added).
+    """
+    import sqlite3
+
+    # Update channel info (subscriber count, video count)
+    try:
+        info = scrape_channel_info(channel['youtube_id'])
+        update_competitor_channel(
+            channel['id'],
+            subscriber_count=info.get('subscriber_count'),
+            video_count=info.get('video_count'),
+            name=info.get('name', channel['name']),
+        )
+    except Exception:
+        pass  # Non-fatal — continue with video scrape even if info update fails
+
+    # Fetch videos
+    videos = scrape_channel_videos(channel['youtube_id'], max_results=max_results)
+    total_fetched = len(videos)
+
+    # Build set of existing youtube_ids if skipping
+    existing_ids: set[str] = set()
+    if skip_existing:
+        existing_videos = get_videos_by_channel(channel['id'])
+        existing_ids = {v['youtube_id'] for v in existing_videos}
+
+    newly_added = 0
+    for video in videos:
+        if skip_existing and video['video_id'] in existing_ids:
+            continue
+        try:
+            create_competitor_video(
+                channel_id=channel['id'],
+                niche_id=niche_id,
+                youtube_id=video['video_id'],
+                title=video['title'],
+                description=video.get('description'),
+                published_at=video.get('published_at'),
+                duration_seconds=video.get('duration', 0),
+                view_count=video.get('view_count'),
+                like_count=video.get('like_count'),
+                comment_count=video.get('comment_count'),
+                thumbnail_url=video.get('thumbnail_url'),
+            )
+            newly_added += 1
+        except sqlite3.IntegrityError:
+            pass  # Duplicate video — skip silently
+
+    mark_as_scraped(channel['id'])
+    return total_fetched, newly_added
+
+
 def render_competitors_tab():
     """Render the Competitors tab."""
     st.subheader("Manage Competitor Channels")
@@ -473,18 +538,42 @@ def render_competitors_tab():
 
                 st.divider()
 
+                # Scrape options
+                st.write("**Scrape Options**")
+                opt1, opt2 = st.columns(2)
+                with opt1:
+                    max_videos_options = {"50": 50, "100": 100, "200": 200, "500": 500, "All": 10000}
+                    max_videos_label = st.selectbox(
+                        "Max videos",
+                        list(max_videos_options.keys()),
+                        key=f"max_videos_{channel['id']}",
+                    )
+                    max_videos = max_videos_options[max_videos_label]
+                with opt2:
+                    skip_default = bool(channel['last_scraped'])
+                    skip_existing = st.checkbox(
+                        "Skip already scraped",
+                        value=skip_default,
+                        key=f"skip_existing_{channel['id']}",
+                    )
+
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
                     if st.button("🔍 Scrape Channel", key=f"scrape_{channel['id']}"):
-                        st.info("Would trigger scraping script here")
-                        st.code(f"python scripts/scrape_channel.py {channel['youtube_id']} --niche-id {current_niche}")
+                        try:
+                            with st.spinner("Scraping..."):
+                                total, added = _scrape_channel(channel, current_niche, max_videos, skip_existing)
+                            st.success(f"Added {added} new videos ({total} fetched)")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Scrape failed: {e}")
 
                 with col2:
                     if st.button("🗑️ Delete Channel", key=f"delete_channel_{channel['id']}"):
                         try:
                             delete_competitor_channel(channel['id'])
-                            st.success("✅ Channel deleted!")
+                            st.success("Channel deleted!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -492,7 +581,13 @@ def render_competitors_tab():
                 with col3:
                     if channel['last_scraped']:
                         if st.button("🔄 Re-scrape", key=f"rescrape_{channel['id']}"):
-                            st.info("Would trigger re-scraping")
+                            try:
+                                with st.spinner("Re-scraping..."):
+                                    total, added = _scrape_channel(channel, current_niche, max_videos, skip_existing)
+                                st.success(f"Added {added} new videos ({total} fetched)")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Re-scrape failed: {e}")
 
 
 def render_glossary_tab():

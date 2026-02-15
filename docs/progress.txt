@@ -1,0 +1,45 @@
+Progress Log - Content Intelligence System
+===========================================
+
+2026-02-15 Session
+-------------------
+1. Auto-embed transcripts on save
+   - Modified Competitive Intel UI (competitive_intel.py) so that saving or updating
+     a transcript automatically chunks it and embeds it into LanceDB, making it
+     immediately searchable without needing to run a separate script.
+
+2. Deduped LanceDB transcript_chunks table
+   - Removed 281 duplicate rows caused by running the batch embed script on
+     already-embedded videos. Table went from 562 -> 281 rows.
+
+3. Fixed missing transcript for video f9Ia5vl32qQ
+   - Transcript file existed on disk (data/transcripts/) but the SQLite row had
+     empty text. Loaded the file content into the database and embedded it.
+     Final count: 288 chunks across 34 videos.
+
+4. Competitive Intel UI improvements
+   - Copy Video ID and Copy YouTube URL buttons now use one-click clipboard copy
+     with "Copied!" confirmation instead of expanding to show the ID.
+   - Added "Transcript Available" filter checkbox alongside renamed
+     "Missing Transcript" filter on the Videos tab.
+
+5. PDF upload and auto-ingest on Canon Sources (niche_setup.py)
+   - Added st.file_uploader for PDFs on the Canon Sources tab.
+   - Uploaded PDFs are saved to data/sources/{niche-slug}/.
+   - Ingestion (extract, chunk, embed) runs automatically on upload.
+   - Wired up the previously stubbed "Trigger Ingestion" and "Re-ingest" buttons
+     to the real pipeline.
+
+6. Hide default Streamlit sidebar navigation
+   - Added .streamlit/config.toml with showSidebarNavigation = false.
+   - Removes the auto-generated page list that linked to blank pages,
+     keeping only the custom Navigation menu.
+
+7. Wired up Scrape/Re-scrape buttons on Competitors tab (niche_setup.py)
+   - Added _scrape_channel() helper that fetches channel info + videos via
+     YouTube Data API, updates channel stats, inserts new videos into DB,
+     and marks channel as scraped.
+   - Added per-channel scrape controls: max videos dropdown (50/100/200/500/All)
+     and "Skip already scraped" checkbox.
+   - Both "Scrape Channel" and "Re-scrape" buttons now call the real scraper
+     with spinner feedback and error handling.
