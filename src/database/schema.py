@@ -306,6 +306,51 @@ def init_db(db_path: Optional[Path] = None) -> None:
         )
     """)
 
+    # 15. production_context
+    # Single-row working context for the video currently being produced
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS production_context (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic TEXT,
+            angle TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 16. production_canon_passages
+    # Canon passages pinned to the active production context
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS production_canon_passages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            context_id INTEGER NOT NULL,
+            chunk_id TEXT,
+            source_title TEXT,
+            chapter TEXT,
+            page INTEGER,
+            authority_score REAL,
+            text TEXT NOT NULL,
+            FOREIGN KEY (context_id) REFERENCES production_context(id)
+        )
+    """)
+
+    # 17. production_transcript_chunks
+    # Competitor transcript chunks pinned to the active production context
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS production_transcript_chunks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            context_id INTEGER NOT NULL,
+            chunk_id TEXT,
+            video_id INTEGER,
+            video_title TEXT,
+            channel_name TEXT,
+            view_count INTEGER,
+            chunk_index INTEGER,
+            text TEXT NOT NULL,
+            FOREIGN KEY (context_id) REFERENCES production_context(id)
+        )
+    """)
+
     # Create indexes for query performance
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_competitor_videos_niche
@@ -351,7 +396,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
     conn.close()
 
     print(f"[OK] Database initialized at {path}")
-    print(f"[OK] Created 14 tables")
+    print(f"[OK] Created 17 tables")
     print(f"[OK] Created 8 indexes")
     print(f"[OK] Foreign key constraints enabled")
 

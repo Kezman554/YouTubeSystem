@@ -43,3 +43,25 @@ Progress Log - Content Intelligence System
      and "Skip already scraped" checkbox.
    - Both "Scrape Channel" and "Re-scrape" buttons now call the real scraper
      with spinner feedback and error handling.
+
+## 2026-02-19 — Production Context DB Layer
+
+Added 3 new SQLite tables and a full CRUD module for the production context feature:
+
+**Tables added to `schema.py` (now 17 total):**
+- `production_context` — single-row: current topic + angle
+- `production_canon_passages` — canon passages pinned to the active context (FK → production_context)
+- `production_transcript_chunks` — competitor transcript chunks pinned to the active context (FK → production_context)
+
+**New module: `src/database/production_context.py`**
+- `get_or_create_production_context()` — returns or creates the single context row
+- `update_production_topic(topic, angle)` — set topic/angle on active context
+- `add_canon_passage(passage_data)` — pin a canon passage (requires `text`)
+- `remove_canon_passage(id)` — unpin by row ID
+- `add_transcript_chunk(chunk_data)` — pin a transcript chunk (requires `text`)
+- `remove_transcript_chunk(id)` — unpin by row ID
+- `get_production_context()` — full context dict with both passage lists
+- `clear_production_context()` — delete all pinned items, reset topic/angle
+- `get_production_item_count()` — total pinned items (for nav badge)
+
+All functions exported from `src/database/__init__.py`. Smoke-tested end-to-end via Python shell — persistence and all CRUD operations verified.
