@@ -10,7 +10,11 @@
       "Bash(python:*)",
       "Bash(sqlite3:*)",
       "Bash(pip install:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(pip show:*)",
+      "Bash(chcp:*)",
+      "Bash(del \"C:\\\\Users\\\\Nick\\\\Desktop\\\\ClaudeYouTubeSystem\\\\scripts\\\\check_transcripts.py\")",
+      "Bash(/c/Users/Nick/Desktop/ClaudeYouTubeSystem/docs/progress.txt:*)"
     ]
   }
 }

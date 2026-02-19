@@ -31,29 +31,31 @@ def render_canon_result(result: Dict[str, Any], index: int):
     distance = result.get('_distance', 1.0)
     relevance = calculate_relevance_percentage(distance)
 
-    # Get source attribution
+    # Get source attribution and authority
     source_id = result.get('source_id')
     source_title = "Unknown Source"
     source_author = None
+    authority = None
 
     if source_id:
         source = get_canon_source(source_id)
         if source:
             source_title = source.get('title', 'Unknown Source')
             source_author = source.get('author')
-
-    # Build attribution string
-    attribution = source_title
-    if source_author:
-        attribution += f" by {source_author}"
+            authority = source.get('priority')
 
     chapter = result.get('chapter')
-    if chapter:
-        attribution += f" - {chapter}"
-
     page = result.get('page')
+
+    # Build breadcrumb: Book > Chapter > Page
+    breadcrumb_parts = [f"**{source_title}**"]
+    if source_author:
+        breadcrumb_parts[0] += f" by {source_author}"
+    if chapter:
+        breadcrumb_parts.append(chapter)
     if page:
-        attribution += f" (p. {page})"
+        breadcrumb_parts.append(f"p. {page}")
+    breadcrumb = " > ".join(breadcrumb_parts)
 
     # Get text
     text = result.get('text', '')
@@ -62,12 +64,16 @@ def render_canon_result(result: Dict[str, Any], index: int):
     with st.container():
         st.markdown(f"### 📖 Canon Result #{index + 1}")
 
-        col1, col2 = st.columns([3, 1])
+        col1, col2, col3 = st.columns([3, 1, 1])
 
         with col1:
-            st.caption(attribution)
+            st.caption(breadcrumb)
 
         with col2:
+            if authority is not None:
+                st.metric("Authority", f"{authority}/10")
+
+        with col3:
             # Relevance badge
             color = "🟢" if relevance >= 75 else "🟡" if relevance >= 50 else "🔴"
             st.metric("Relevance", f"{color} {relevance:.1f}%")

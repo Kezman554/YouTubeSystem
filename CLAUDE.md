@@ -26,14 +26,13 @@ Target: £2-3k/month revenue within 12-18 months.
 
 **Hardware constraint:** 4GB VRAM laptop. No local LLMs or image generation until GPU upgrade.
 
-## Architecture Docs
-
-Before implementing any feature, read the relevant doc:
+## Architecture Docs to reference
 
 - `docs/SYSTEM_OVERVIEW.md` — Architecture decisions, costs, phases
 - `docs/DATA_MODEL.md` — Database schema (13 SQLite tables, 2 LanceDB collections)
 - `docs/PIPELINE.md` — Processing flow, code patterns, error handling
 - `docs/UI_SPEC.md` — Dashboard screens, build order
+- `docs/progress.txt` — Updates (This file was not added until after MVP was built)
 
 ## Constraints
 
@@ -48,7 +47,5 @@ Before implementing any feature, read the relevant doc:
 - Write tests alongside features
 - Handle errors for external API calls
 - Commit frequently with clear messages
+- After completing a task, append a brief summary to docs/progress.txt
 
-## Builder Context
-
-Nick is a beginner coder learning through building. Explain decisions clearly. Build incrementally. Prefer simple solutions.

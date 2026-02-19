@@ -109,10 +109,14 @@ def render_videos_tab(niche_id: int):
         )
 
     with col4:
-        # Transcript filter
-        transcript_filter = st.checkbox(
-            "Missing transcripts only",
+        # Transcript filters
+        transcript_missing = st.checkbox(
+            "Missing Transcript",
             key="video_transcript_filter"
+        )
+        transcript_available = st.checkbox(
+            "Transcript Available",
+            key="video_transcript_available_filter"
         )
 
     # Apply filters
@@ -145,8 +149,10 @@ def render_videos_tab(niche_id: int):
         filtered_videos = [v for v in filtered_videos if (v['view_count'] or 0) >= min_views]
 
     # Transcript filter
-    if transcript_filter:
+    if transcript_missing and not transcript_available:
         filtered_videos = [v for v in filtered_videos if not v['has_transcript']]
+    elif transcript_available and not transcript_missing:
+        filtered_videos = [v for v in filtered_videos if v['has_transcript']]
 
     st.divider()
 
@@ -210,10 +216,28 @@ def render_videos_tab(niche_id: int):
                 youtube_url = f"https://www.youtube.com/watch?v={video['youtube_id']}"
                 st.markdown(f"[🔗 Watch on YouTube]({youtube_url})")
 
-                # Copy video ID button
-                if st.button("📋 Copy Video ID", key=f"copy_{video['id']}"):
-                    st.code(video['youtube_id'])
-                    st.info("Video ID displayed above. Copy it manually.")
+                # Copy buttons
+                btn_col1, btn_col2, _ = st.columns([1, 1, 2])
+                with btn_col1:
+                    if st.button("📋 Copy Video ID", key=f"copy_{video['id']}"):
+                        st.session_state[f"copied_id_{video['id']}"] = True
+                    if st.session_state.get(f"copied_id_{video['id']}"):
+                        st.components.v1.html(
+                            f"<script>navigator.clipboard.writeText('{video['youtube_id']}');</script>",
+                            height=0
+                        )
+                        st.success("Copied!")
+                        del st.session_state[f"copied_id_{video['id']}"]
+                with btn_col2:
+                    if st.button("📋 Copy YouTube URL", key=f"copy_url_{video['id']}"):
+                        st.session_state[f"copied_url_{video['id']}"] = True
+                    if st.session_state.get(f"copied_url_{video['id']}"):
+                        st.components.v1.html(
+                            f"<script>navigator.clipboard.writeText('{youtube_url}');</script>",
+                            height=0
+                        )
+                        st.success("Copied!")
+                        del st.session_state[f"copied_url_{video['id']}"]
 
             with col2:
                 st.metric("Likes", f"{video['like_count']:,}" if video['like_count'] else "N/A")

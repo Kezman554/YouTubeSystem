@@ -65,3 +65,11 @@ Added 3 new SQLite tables and a full CRUD module for the production context feat
 - `get_production_item_count()` — total pinned items (for nav badge)
 
 All functions exported from `src/database/__init__.py`. Smoke-tested end-to-end via Python shell — persistence and all CRUD operations verified.
+
+## 2026-02-19 — Canon Search Result Card Enhancements
+
+Updated `render_canon_result()` in `src/ui/pages/research.py`:
+- Added **Authority score** metric (from `canon_sources.priority` field), displayed as "X/10"
+- Changed attribution line to **breadcrumb format**: Book > Chapter > p. X
+- Layout changed from 2-column to 3-column to fit Authority + Relevance side-by-side
+- Existing relevance score display preserved
