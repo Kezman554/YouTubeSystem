@@ -73,3 +73,15 @@ Updated `render_canon_result()` in `src/ui/pages/research.py`:
 - Changed attribution line to **breadcrumb format**: Book > Chapter > p. X
 - Layout changed from 2-column to 3-column to fit Authority + Relevance side-by-side
 - Existing relevance score display preserved
+
+## 2026-02-19 — Add to Context Buttons on Search Results
+
+Added "Add to Context" buttons to both canon and transcript search result cards in
+`src/ui/pages/research.py`:
+- Each result card shows a **"+ Add to Context"** button below the preview expander
+- Clicking calls `add_canon_passage()` or `add_transcript_chunk()` from production_context module
+- Shows **toast notification** with current total item count: "Added to Context (N items)"
+- Pages **rerun** after adding so the button state updates immediately
+- Already-added items show **"Added ✓" disabled button** — checked by matching LanceDB `id`
+  against `chunk_id` in `production_canon_passages` / `production_transcript_chunks`
+- Added `_get_added_chunk_ids()` helper that loads all pinned chunk IDs once per render cycle

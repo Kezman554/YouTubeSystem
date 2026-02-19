@@ -10,6 +10,25 @@ from src.database.niches import get_all_niches
 from src.database.canon_sources import get_canon_source
 from src.database.competitor_videos import get_competitor_video
 from src.database.competitor_channels import get_competitor_channel
+from src.database.production_context import (
+    add_canon_passage,
+    add_transcript_chunk,
+    get_production_context,
+    get_production_item_count,
+)
+
+
+def _get_added_chunk_ids() -> set:
+    """Return set of chunk_ids already pinned to the production context."""
+    ctx = get_production_context()
+    ids = set()
+    for p in ctx.get("canon_passages", []):
+        if p.get("chunk_id"):
+            ids.add(p["chunk_id"])
+    for c in ctx.get("transcript_chunks", []):
+        if c.get("chunk_id"):
+            ids.add(c["chunk_id"])
+    return ids
 
 
 def calculate_relevance_percentage(distance: float) -> float:
@@ -24,7 +43,7 @@ def calculate_relevance_percentage(distance: float) -> float:
     return similarity * 100
 
 
-def render_canon_result(result: Dict[str, Any], index: int):
+def render_canon_result(result: Dict[str, Any], index: int, added_ids: set):
     """Render a single canon search result as a card."""
 
     # Calculate relevance
@@ -91,10 +110,33 @@ def render_canon_result(result: Dict[str, Any], index: int):
                 st.code(text)
                 st.info("Text displayed above - copy it manually.")
 
+        # Add to Context button
+        chunk_id = result.get('id')
+        already_added = chunk_id in added_ids if chunk_id else False
+
+        if already_added:
+            st.button("Added ✓", key=f"ctx_canon_{index}_{source_id}", disabled=True)
+        else:
+            if st.button("+ Add to Context", key=f"ctx_canon_{index}_{source_id}"):
+                try:
+                    add_canon_passage({
+                        "chunk_id": chunk_id,
+                        "source_title": source_title,
+                        "chapter": chapter,
+                        "page": page,
+                        "authority_score": authority,
+                        "text": text,
+                    })
+                    count = get_production_item_count()
+                    st.toast(f"Added to Context ({count} items)")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to add: {e}")
+
         st.divider()
 
 
-def render_transcript_result(result: Dict[str, Any], index: int):
+def render_transcript_result(result: Dict[str, Any], index: int, added_ids: set):
     """Render a single transcript search result as a card."""
 
     # Calculate relevance
@@ -170,6 +212,30 @@ def render_transcript_result(result: Dict[str, Any], index: int):
             if st.button("📋 Copy Full Text", key=f"copy_transcript_{index}_{video_id}"):
                 st.code(text)
                 st.info("Text displayed above - copy it manually.")
+
+        # Add to Context button
+        chunk_id = result.get('id')
+        already_added = chunk_id in added_ids if chunk_id else False
+
+        if already_added:
+            st.button("Added ✓", key=f"ctx_trans_{index}_{video_id}", disabled=True)
+        else:
+            if st.button("+ Add to Context", key=f"ctx_trans_{index}_{video_id}"):
+                try:
+                    add_transcript_chunk({
+                        "chunk_id": chunk_id,
+                        "video_id": video_id,
+                        "video_title": video_title,
+                        "channel_name": channel_name,
+                        "view_count": view_count,
+                        "chunk_index": result.get('chunk_index'),
+                        "text": text,
+                    })
+                    count = get_production_item_count()
+                    st.toast(f"Added to Context ({count} items)")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to add: {e}")
 
         st.divider()
 
@@ -308,17 +374,20 @@ def render():
 
                     st.divider()
 
+                    # Load already-added IDs once for all results
+                    added_ids = _get_added_chunk_ids()
+
                     # Display canon results
                     if canon_results:
                         st.markdown("## 📖 Canon Sources")
                         for idx, result in enumerate(canon_results):
-                            render_canon_result(result, idx)
+                            render_canon_result(result, idx, added_ids)
 
                     # Display transcript results
                     if transcript_results:
                         st.markdown("## 🎥 Video Transcripts")
                         for idx, result in enumerate(transcript_results):
-                            render_transcript_result(result, idx)
+                            render_transcript_result(result, idx, added_ids)
 
                     # Load more button (pagination placeholder)
                     if total_results >= results_per_page:
