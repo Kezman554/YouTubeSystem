@@ -20,6 +20,11 @@ from src.database.competitor_videos import (
 from src.pipeline.chunk import chunk_text
 from src.pipeline.embed import embed_batch
 from src.pipeline.vectorstore import get_db, store_transcript_chunks
+from src.database.production_context import (
+    add_transcript_chunk,
+    get_production_context,
+    get_production_item_count,
+)
 
 
 def embed_transcript(video: dict, transcript: str, channel_name: str) -> bool:
@@ -62,6 +67,28 @@ def embed_transcript(video: dict, transcript: str, channel_name: str) -> bool:
     except Exception as e:
         st.error(f"Embedding failed: {e}")
         return False
+
+
+def _get_added_chunk_ids() -> set:
+    """Return set of chunk_ids already pinned to the production context."""
+    ctx = get_production_context()
+    ids = set()
+    for c in ctx.get("transcript_chunks", []):
+        if c.get("chunk_id"):
+            ids.add(c["chunk_id"])
+    return ids
+
+
+def _get_video_chunks(video_id: int) -> list:
+    """Fetch transcript chunks for a video from LanceDB."""
+    try:
+        db = get_db()
+        table = db.open_table("transcript_chunks")
+        rows = table.search().where(f"video_id = {video_id}").limit(500).to_list()
+        rows.sort(key=lambda r: r.get("chunk_index", 0))
+        return rows
+    except Exception:
+        return []
 
 
 def render_videos_tab(niche_id: int):
@@ -273,6 +300,56 @@ def render_videos_tab(niche_id: int):
                             else:
                                 st.warning("Transcript saved but embedding failed. Run embed_transcripts.py manually.")
                         st.rerun()
+
+                # View as chunks with Add to Context buttons
+                if st.checkbox("View Chunks", key=f"view_chunks_{video['id']}"):
+                    chunks = _get_video_chunks(video['id'])
+                    if not chunks:
+                        st.info("No embedded chunks found. The transcript may not have been embedded yet.")
+                    else:
+                        added_ids = _get_added_chunk_ids()
+                        st.caption(f"{len(chunks)} chunks")
+                        for ci, chunk in enumerate(chunks):
+                            chunk_id = chunk.get('id')
+                            chunk_text_val = chunk.get('text', '')
+                            preview = chunk_text_val[:200].replace('\n', ' ').strip()
+                            if len(chunk_text_val) > 200:
+                                preview += "..."
+
+                            with st.container():
+                                st.markdown(f"**Chunk {ci + 1}**")
+                                st.caption(preview)
+
+                                btn_col1, btn_col2 = st.columns([1, 3])
+                                with btn_col1:
+                                    already_added = chunk_id in added_ids if chunk_id else False
+                                    if already_added:
+                                        st.button(
+                                            "Added ✓",
+                                            key=f"ctx_chunk_{video['id']}_{ci}",
+                                            disabled=True,
+                                        )
+                                    else:
+                                        if st.button(
+                                            "+ Add to Context",
+                                            key=f"ctx_chunk_{video['id']}_{ci}",
+                                        ):
+                                            try:
+                                                add_transcript_chunk({
+                                                    "chunk_id": chunk_id,
+                                                    "video_id": video['id'],
+                                                    "video_title": video['title'],
+                                                    "channel_name": channel_name,
+                                                    "view_count": video.get('view_count'),
+                                                    "chunk_index": chunk.get('chunk_index'),
+                                                    "text": chunk_text_val,
+                                                })
+                                                count = get_production_item_count()
+                                                st.toast(f"Added to Context ({count} items)")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Failed to add: {e}")
+                                st.divider()
             else:
                 st.warning("❌ No transcript yet")
 

@@ -85,3 +85,14 @@ Added "Add to Context" buttons to both canon and transcript search result cards 
 - Already-added items show **"Added ✓" disabled button** — checked by matching LanceDB `id`
   against `chunk_id` in `production_canon_passages` / `production_transcript_chunks`
 - Added `_get_added_chunk_ids()` helper that loads all pinned chunk IDs once per render cycle
+
+## 2026-02-19 — Add to Context on Competitive Intel Transcript Chunks
+
+Added "Add to Context" buttons to individual transcript chunks in
+`src/ui/pages/competitive_intel.py`:
+- New **"View Chunks"** checkbox on videos with transcripts, below "View/Edit Transcript"
+- Queries LanceDB `transcript_chunks` table filtered by `video_id` to get embedded chunks
+- Each chunk displays a 200-char preview with **"+ Add to Context"** / **"Added ✓"** button
+- Uses same `add_transcript_chunk()`, toast, rerun, and `_get_added_chunk_ids()` pattern as Research page
+- Added `_get_video_chunks(video_id)` helper to fetch and sort chunks from LanceDB
+- Chunk IDs are shared across pages — adding from Competitive Intel shows "Added ✓" on Research page too
