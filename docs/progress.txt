@@ -103,3 +103,16 @@ Updated `src/ui/app.py` sidebar to show a live count badge on the Production nav
 - Calls `get_production_item_count()` on each render to get total staged items
 - Displays "Production (N)" when N > 0, plain "Production" when empty
 - Count updates automatically when navigating between pages (Streamlit reruns on interaction)
+
+## 2026-02-22 — Production Page
+
+Created `src/ui/pages/production.py` — the Production page for viewing and managing
+staged source material:
+- Video Details: topic and angle text inputs with auto-save on change
+- Canon Passages section: lists pinned passages with source/chapter/page labels,
+  authority score badge, 200-char preview, expander for full text, Remove button
+- Competitor Transcripts section: auto-summary of unique videos with titles/channels/views,
+  individual chunk cards with expander and Remove button, attribution warning caption
+- Clear Section buttons for each section, Clear All button in footer
+- Moved Production from Phase 2 (disabled) to active navigation in `src/ui/app.py`
+- Added route in `route_to_page()` to load the new page

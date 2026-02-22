@@ -67,14 +67,6 @@ def render_sidebar():
         # Navigation menu
         st.subheader("Navigation")
 
-        pages = {
-            "📊 Home": "Home",
-            "⚙️ Niche Setup": "Niche Setup",
-            "🔍 Competitive Intel": "Competitive Intel",
-            "📚 Research": "Research",
-            "⚡ Settings": "Settings"
-        }
-
         # Production item count for nav badge
         try:
             prod_count = get_production_item_count()
@@ -83,9 +75,17 @@ def render_sidebar():
 
         prod_label = f"🎬 Production ({prod_count})" if prod_count > 0 else "🎬 Production"
 
+        pages = {
+            "📊 Home": "Home",
+            "⚙️ Niche Setup": "Niche Setup",
+            "🔍 Competitive Intel": "Competitive Intel",
+            "📚 Research": "Research",
+            prod_label: "Production",
+            "⚡ Settings": "Settings"
+        }
+
         # Phase 2 pages (disabled for now)
         phase_2_pages = {
-            prod_label: "Production",
             "💡 Ideation": "Ideation",
             "🖼️ Asset Library": "Asset Library",
             "📈 My Analytics": "My Analytics",
@@ -170,6 +170,10 @@ def route_to_page():
     elif page == "Research":
         from pages import research
         research.render()
+
+    elif page == "Production":
+        from pages import production
+        production.render()
 
     elif page == "Settings":
         from pages import settings
