@@ -19,6 +19,57 @@ from src.database.production_context import (
 )
 
 
+def _find_boundary_overlap(text_a: str, text_b: str, min_overlap: int = 20) -> int:
+    """
+    Find the longest suffix of text_a that matches a prefix of text_b.
+
+    Checks all possible overlap lengths from longest to shortest, returning
+    the first (longest) match found. Returns 0 if no overlap of at least
+    min_overlap characters exists.
+
+    Args:
+        text_a: The preceding text.
+        text_b: The following text.
+        min_overlap: Minimum number of characters to consider a valid overlap.
+
+    Returns:
+        Length of the overlapping substring, or 0 if none found.
+    """
+    max_possible = min(len(text_a), len(text_b))
+    for length in range(max_possible, min_overlap - 1, -1):
+        if text_a.endswith(text_b[:length]):
+            return length
+    return 0
+
+
+def _merge_adjacent_texts(texts: list[str], min_overlap: int = 20) -> list[str]:
+    """
+    Merge a sorted list of text strings, removing boundary overlaps.
+
+    Walks the list pairwise. When an overlap is found between the end of one
+    text and the start of the next, the two are merged into one with the
+    duplicate removed. Non-overlapping texts are kept separate.
+
+    Args:
+        texts: Ordered list of text strings to merge.
+        min_overlap: Minimum characters for an overlap to count.
+
+    Returns:
+        New list with overlapping adjacent texts merged.
+    """
+    if not texts:
+        return []
+
+    merged = [texts[0]]
+    for text in texts[1:]:
+        overlap = _find_boundary_overlap(merged[-1], text, min_overlap)
+        if overlap > 0:
+            merged[-1] = merged[-1] + text[overlap:]
+        else:
+            merged.append(text)
+    return merged
+
+
 def format_export(ctx: dict) -> str:
     """
     Format the full production context as structured text for export.
@@ -45,6 +96,7 @@ def format_export(ctx: dict) -> str:
 
     # --- Canon passages grouped by source_title ---
     passages = ctx.get("canon_passages", [])
+    any_merged = False
     if passages:
         lines.append("## Canon Sources")
         lines.append("")
@@ -59,11 +111,27 @@ def format_export(ctx: dict) -> str:
             # Sort by chapter (string, None-safe) then page (int, None-safe)
             group.sort(key=lambda p: (p.get("chapter") or "", p.get("page") or 0))
 
+            # Merge overlapping adjacent passages
+            raw_texts = [p["text"] for p in group]
+            merged_texts = _merge_adjacent_texts(raw_texts)
+            if len(merged_texts) < len(raw_texts):
+                any_merged = True
+
             lines.append(f"### {source_title}")
             lines.append("")
 
-            for p in group:
-                # Location line
+            # Build location lines from the first passage of each merged run
+            text_idx = 0
+            for merged_text in merged_texts:
+                # Find all original passages that were merged into this text
+                span_start = text_idx
+                consumed = 0
+                while text_idx < len(group) and consumed < len(merged_text):
+                    consumed += len(group[text_idx]["text"])
+                    text_idx += 1
+
+                # Use the first passage in the span for the location line
+                p = group[span_start]
                 loc_parts = []
                 if p.get("chapter"):
                     loc_parts.append(p["chapter"])
@@ -71,10 +139,14 @@ def format_export(ctx: dict) -> str:
                     loc_parts.append(f"p.{p['page']}")
                 if p.get("authority_score") is not None:
                     loc_parts.append(f"authority {p['authority_score']:.0f}")
+                # If span covers multiple passages, note the range
+                end_p = group[text_idx - 1]
+                if end_p.get("page") and end_p["page"] != (p.get("page") or 0):
+                    loc_parts.append(f"to p.{end_p['page']}")
                 if loc_parts:
                     lines.append(f"[{' | '.join(loc_parts)}]")
 
-                lines.append(p["text"])
+                lines.append(merged_text)
                 lines.append("")
 
     # --- Transcript chunks grouped by video_id ---
@@ -112,9 +184,19 @@ def format_export(ctx: dict) -> str:
             lines.append(header)
             lines.append("")
 
-            for c in group:
-                lines.append(c["text"])
+            # Merge overlapping adjacent chunks
+            raw_texts = [c["text"] for c in group]
+            merged_texts = _merge_adjacent_texts(raw_texts)
+            if len(merged_texts) < len(raw_texts):
+                any_merged = True
+
+            for text in merged_texts:
+                lines.append(text)
                 lines.append("")
+
+    if any_merged:
+        lines.append("Note: Adjacent passages auto-merged. Occasional overlap may remain at boundaries.")
+        lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 

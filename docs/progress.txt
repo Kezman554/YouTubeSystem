@@ -124,5 +124,13 @@ Added `format_export()` to `src/ui/pages/production.py`:
 - Within each video, sorts by chunk_index
 - Formats with markdown headers, location metadata, and attribution
 - Includes "do not copy directly" warning for competitor transcripts
-- 16 tests in `tests/test_production_export.py` covering grouping, sorting,
-  headers, attribution, edge cases (missing metadata, empty sections)
+- 35 tests in `tests/test_production_export.py` covering grouping, sorting,
+  headers, attribution, edge cases (missing metadata, empty sections), and merging
+
+Added overlap detection and merging to export:
+- `_find_boundary_overlap(a, b)` finds longest suffix-prefix match (min 20 chars)
+- `_merge_adjacent_texts(texts)` walks sorted texts and merges overlapping pairs
+- Applied to both canon passages (within same source) and transcript chunks (within same video)
+- Merged passages show page range in location line (e.g. "p.50 | to p.51")
+- Footer note "Adjacent passages auto-merged..." appears only when merges occurred
+- Different sources/videos never merge across group boundaries
