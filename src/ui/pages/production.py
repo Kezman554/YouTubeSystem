@@ -334,10 +334,18 @@ def render():
     st.divider()
     _render_transcript_chunks(ctx.get("transcript_chunks", []))
 
-    # Footer: Clear All
+    # Footer: Export + Clear All
     st.divider()
     total = len(ctx.get("canon_passages", [])) + len(ctx.get("transcript_chunks", []))
     if total > 0:
+        export_text = format_export(ctx)
+
+        with st.expander("Preview Export"):
+            st.markdown(export_text)
+
+        st.caption("Click the copy icon in the top-right corner of the box below to copy.")
+        st.code(export_text, language="markdown")
+
         if st.button("Clear All", type="primary"):
             clear_production_context()
             st.rerun()

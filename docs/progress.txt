@@ -134,3 +134,8 @@ Added overlap detection and merging to export:
 - Merged passages show page range in location line (e.g. "p.50 | to p.51")
 - Footer note "Adjacent passages auto-merged..." appears only when merges occurred
 - Different sources/videos never merge across group boundaries
+
+Added export preview and copy-to-clipboard to Production page footer:
+- "Preview Export" expander renders the formatted markdown output live
+- `st.code` block with built-in copy button for clipboard access
+- Both update automatically as items are added/removed (Streamlit rerun)
