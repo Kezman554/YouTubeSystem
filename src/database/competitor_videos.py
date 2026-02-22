@@ -11,6 +11,21 @@ from pathlib import Path
 from .schema import get_connection
 
 
+def ensure_video_status_column(db_path: Optional[Path] = None) -> None:
+    """Add video_status column to competitor_videos if it doesn't exist (migration)."""
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            "ALTER TABLE competitor_videos ADD COLUMN video_status TEXT DEFAULT 'available'"
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    finally:
+        conn.close()
+
+
 def create_competitor_video(
     channel_id: int,
     niche_id: int,
@@ -116,7 +131,7 @@ def get_competitor_video(video_id: int, db_path: Optional[Path] = None) -> Optio
             SELECT id, channel_id, niche_id, youtube_id, title, description, published_at,
                    duration_seconds, view_count, like_count, comment_count, thumbnail_url,
                    thumbnail_path, views_per_sub, topic_tags, has_transcript, transcript_cleaned,
-                   first_scraped, last_updated, created_at
+                   video_status, first_scraped, last_updated, created_at
             FROM competitor_videos
             WHERE id = ?
             """,
@@ -145,9 +160,10 @@ def get_competitor_video(video_id: int, db_path: Optional[Path] = None) -> Optio
             "topic_tags": row[14],
             "has_transcript": bool(row[15]),
             "transcript_cleaned": bool(row[16]),
-            "first_scraped": row[17],
-            "last_updated": row[18],
-            "created_at": row[19]
+            "video_status": row[17] or "available",
+            "first_scraped": row[18],
+            "last_updated": row[19],
+            "created_at": row[20]
         }
     finally:
         conn.close()
@@ -176,7 +192,7 @@ def get_competitor_video_by_youtube_id(
             SELECT id, channel_id, niche_id, youtube_id, title, description, published_at,
                    duration_seconds, view_count, like_count, comment_count, thumbnail_url,
                    thumbnail_path, views_per_sub, topic_tags, has_transcript, transcript_cleaned,
-                   first_scraped, last_updated, created_at
+                   video_status, first_scraped, last_updated, created_at
             FROM competitor_videos
             WHERE youtube_id = ?
             """,
@@ -205,9 +221,10 @@ def get_competitor_video_by_youtube_id(
             "topic_tags": row[14],
             "has_transcript": bool(row[15]),
             "transcript_cleaned": bool(row[16]),
-            "first_scraped": row[17],
-            "last_updated": row[18],
-            "created_at": row[19]
+            "video_status": row[17] or "available",
+            "first_scraped": row[18],
+            "last_updated": row[19],
+            "created_at": row[20]
         }
     finally:
         conn.close()
@@ -234,13 +251,14 @@ def get_videos_by_channel(
     cursor = conn.cursor()
 
     try:
+        ensure_video_status_column(db_path)
         if limit:
             cursor.execute(
                 """
                 SELECT id, channel_id, niche_id, youtube_id, title, description, published_at,
                        duration_seconds, view_count, like_count, comment_count, thumbnail_url,
                        thumbnail_path, views_per_sub, topic_tags, has_transcript, transcript_cleaned,
-                       first_scraped, last_updated, created_at
+                       video_status, first_scraped, last_updated, created_at
                 FROM competitor_videos
                 WHERE channel_id = ?
                 ORDER BY published_at DESC
@@ -254,7 +272,7 @@ def get_videos_by_channel(
                 SELECT id, channel_id, niche_id, youtube_id, title, description, published_at,
                        duration_seconds, view_count, like_count, comment_count, thumbnail_url,
                        thumbnail_path, views_per_sub, topic_tags, has_transcript, transcript_cleaned,
-                       first_scraped, last_updated, created_at
+                       video_status, first_scraped, last_updated, created_at
                 FROM competitor_videos
                 WHERE channel_id = ?
                 ORDER BY published_at DESC
@@ -283,9 +301,10 @@ def get_videos_by_channel(
                 "topic_tags": row[14],
                 "has_transcript": bool(row[15]),
                 "transcript_cleaned": bool(row[16]),
-                "first_scraped": row[17],
-                "last_updated": row[18],
-                "created_at": row[19]
+                "video_status": row[17] or "available",
+                "first_scraped": row[18],
+                "last_updated": row[19],
+                "created_at": row[20]
             }
             for row in rows
         ]
@@ -314,13 +333,14 @@ def get_videos_by_niche(
     cursor = conn.cursor()
 
     try:
+        ensure_video_status_column(db_path)
         if limit:
             cursor.execute(
                 """
                 SELECT id, channel_id, niche_id, youtube_id, title, description, published_at,
                        duration_seconds, view_count, like_count, comment_count, thumbnail_url,
                        thumbnail_path, views_per_sub, topic_tags, has_transcript, transcript_cleaned,
-                       first_scraped, last_updated, created_at
+                       video_status, first_scraped, last_updated, created_at
                 FROM competitor_videos
                 WHERE niche_id = ?
                 ORDER BY published_at DESC
@@ -334,7 +354,7 @@ def get_videos_by_niche(
                 SELECT id, channel_id, niche_id, youtube_id, title, description, published_at,
                        duration_seconds, view_count, like_count, comment_count, thumbnail_url,
                        thumbnail_path, views_per_sub, topic_tags, has_transcript, transcript_cleaned,
-                       first_scraped, last_updated, created_at
+                       video_status, first_scraped, last_updated, created_at
                 FROM competitor_videos
                 WHERE niche_id = ?
                 ORDER BY published_at DESC
@@ -363,9 +383,10 @@ def get_videos_by_niche(
                 "topic_tags": row[14],
                 "has_transcript": bool(row[15]),
                 "transcript_cleaned": bool(row[16]),
-                "first_scraped": row[17],
-                "last_updated": row[18],
-                "created_at": row[19]
+                "video_status": row[17] or "available",
+                "first_scraped": row[18],
+                "last_updated": row[19],
+                "created_at": row[20]
             }
             for row in rows
         ]
@@ -405,7 +426,8 @@ def update_competitor_video(
         "channel_id", "niche_id", "youtube_id", "title", "description",
         "published_at", "duration_seconds", "view_count", "like_count",
         "comment_count", "thumbnail_url", "thumbnail_path", "views_per_sub",
-        "topic_tags", "has_transcript", "transcript_cleaned", "transcript"
+        "topic_tags", "has_transcript", "transcript_cleaned", "transcript",
+        "video_status"
     }
     provided_fields = set(fields.keys())
 

@@ -145,6 +145,10 @@ def render_videos_tab(niche_id: int):
             "Transcript Available",
             key="video_transcript_available_filter"
         )
+        show_removed = st.checkbox(
+            "Removed/Private",
+            key="video_removed_filter"
+        )
 
     # Apply filters
     filtered_videos = all_videos.copy()
@@ -180,6 +184,12 @@ def render_videos_tab(niche_id: int):
         filtered_videos = [v for v in filtered_videos if not v['has_transcript']]
     elif transcript_available and not transcript_missing:
         filtered_videos = [v for v in filtered_videos if v['has_transcript']]
+
+    # Video status filter
+    if show_removed:
+        filtered_videos = [v for v in filtered_videos if v.get('video_status') in ('removed', 'private')]
+    else:
+        filtered_videos = [v for v in filtered_videos if v.get('video_status', 'available') == 'available']
 
     st.divider()
 
@@ -228,8 +238,16 @@ def render_videos_tab(niche_id: int):
         # Transcript status
         transcript_icon = "✅" if video['has_transcript'] else "❌"
 
+        # Status badge for removed/private videos
+        status_badge = ""
+        video_status = video.get('video_status', 'available')
+        if video_status == 'removed':
+            status_badge = " (Removed)"
+        elif video_status == 'private':
+            status_badge = " (Private)"
+
         # Create expander with video info
-        with st.expander(f"{transcript_icon} {video['title'][:80]}... | {channel_name} | {views_str} views | {date_str}"):
+        with st.expander(f"{transcript_icon} {video['title'][:80]}... | {channel_name} | {views_str} views | {date_str}{status_badge}"):
             col1, col2 = st.columns([2, 1])
 
             with col1:
@@ -377,6 +395,17 @@ def render_videos_tab(niche_id: int):
                         st.rerun()
                     else:
                         st.error("Please enter a transcript before saving.")
+
+            # Video status controls
+            st.divider()
+            if video_status == 'available':
+                if st.button("🚫 Mark Unavailable", key=f"mark_removed_{video['id']}"):
+                    update_competitor_video(video['id'], video_status="removed")
+                    st.rerun()
+            else:
+                if st.button("↩️ Mark Available", key=f"mark_available_{video['id']}"):
+                    update_competitor_video(video['id'], video_status="available")
+                    st.rerun()
 
 
 def render_topics_tab(niche_id: int):

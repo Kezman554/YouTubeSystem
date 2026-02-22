@@ -139,3 +139,15 @@ Added export preview and copy-to-clipboard to Production page footer:
 - "Preview Export" expander renders the formatted markdown output live
 - `st.code` block with built-in copy button for clipboard access
 - Both update automatically as items are added/removed (Streamlit rerun)
+
+## 2026-02-22 — Mark Videos as Unavailable in Competitive Intel
+
+Added `video_status` column to `competitor_videos` for flagging removed/private videos:
+- Schema: added `video_status TEXT DEFAULT 'available'` column to `competitor_videos` table
+- Migration: `ensure_video_status_column()` auto-runs on `get_videos_by_niche()` and
+  `get_videos_by_channel()` so existing databases migrate seamlessly
+- Added `video_status` to all SELECT queries and `update_competitor_video()` valid fields
+- UI: "Removed/Private" filter checkbox on Videos tab — shows only flagged videos with badge
+- Default video list now excludes removed/private videos automatically
+- "Mark Unavailable" button at bottom of each video panel; "Mark Available" to restore
+- All 34 existing tests pass

@@ -139,6 +139,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
             topic_tags TEXT,
             has_transcript BOOLEAN DEFAULT FALSE,
             transcript_cleaned BOOLEAN DEFAULT FALSE,
+            video_status TEXT DEFAULT 'available',
             first_scraped TIMESTAMP,
             last_updated TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
