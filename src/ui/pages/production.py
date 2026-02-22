@@ -6,6 +6,8 @@ pinned from Research and Competitive Intel pages, along with the
 video topic and angle.
 """
 
+from collections import defaultdict
+
 import streamlit as st
 
 from src.database.production_context import (
@@ -15,6 +17,106 @@ from src.database.production_context import (
     remove_transcript_chunk,
     clear_production_context,
 )
+
+
+def format_export(ctx: dict) -> str:
+    """
+    Format the full production context as structured text for export.
+
+    Groups canon passages by source_title, sorted by chapter then page within
+    each source. Groups transcript chunks by video_id, sorted by chunk_index
+    within each video. Includes headers and attribution throughout.
+
+    Args:
+        ctx: The dict returned by get_production_context().
+
+    Returns:
+        Formatted plain-text string ready for clipboard or file export.
+    """
+    lines: list[str] = []
+
+    # Header
+    topic = ctx.get("topic") or "Untitled"
+    angle = ctx.get("angle") or ""
+    lines.append(f"# {topic}")
+    if angle:
+        lines.append(f"Angle: {angle}")
+    lines.append("")
+
+    # --- Canon passages grouped by source_title ---
+    passages = ctx.get("canon_passages", [])
+    if passages:
+        lines.append("## Canon Sources")
+        lines.append("")
+
+        by_source: dict[str, list[dict]] = defaultdict(list)
+        for p in passages:
+            key = p.get("source_title") or "Unknown Source"
+            by_source[key].append(p)
+
+        for source_title in sorted(by_source):
+            group = by_source[source_title]
+            # Sort by chapter (string, None-safe) then page (int, None-safe)
+            group.sort(key=lambda p: (p.get("chapter") or "", p.get("page") or 0))
+
+            lines.append(f"### {source_title}")
+            lines.append("")
+
+            for p in group:
+                # Location line
+                loc_parts = []
+                if p.get("chapter"):
+                    loc_parts.append(p["chapter"])
+                if p.get("page"):
+                    loc_parts.append(f"p.{p['page']}")
+                if p.get("authority_score") is not None:
+                    loc_parts.append(f"authority {p['authority_score']:.0f}")
+                if loc_parts:
+                    lines.append(f"[{' | '.join(loc_parts)}]")
+
+                lines.append(p["text"])
+                lines.append("")
+
+    # --- Transcript chunks grouped by video_id ---
+    chunks = ctx.get("transcript_chunks", [])
+    if chunks:
+        lines.append("## Competitor Transcripts")
+        lines.append("(Reference only — do not copy directly)")
+        lines.append("")
+
+        by_video: dict[str, list[dict]] = defaultdict(list)
+        for c in chunks:
+            # Use video_id as key; fall back to video_title for ungrouped chunks
+            key = str(c.get("video_id") or c.get("video_title") or "unknown")
+            by_video[key].append(c)
+
+        for key in sorted(by_video):
+            group = by_video[key]
+            group.sort(key=lambda c: c.get("chunk_index") or 0)
+
+            # Build header from first chunk's metadata
+            first = group[0]
+            title = first.get("video_title") or "Unknown Video"
+            channel = first.get("channel_name") or ""
+            views = first.get("view_count")
+
+            header = f"### {title}"
+            attr_parts = []
+            if channel:
+                attr_parts.append(channel)
+            if views:
+                attr_parts.append(f"{views:,} views")
+            if attr_parts:
+                header += f" ({' | '.join(attr_parts)})"
+
+            lines.append(header)
+            lines.append("")
+
+            for c in group:
+                lines.append(c["text"])
+                lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _render_video_details(ctx: dict):
