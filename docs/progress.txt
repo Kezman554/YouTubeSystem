@@ -96,3 +96,10 @@ Added "Add to Context" buttons to individual transcript chunks in
 - Uses same `add_transcript_chunk()`, toast, rerun, and `_get_added_chunk_ids()` pattern as Research page
 - Added `_get_video_chunks(video_id)` helper to fetch and sort chunks from LanceDB
 - Chunk IDs are shared across pages — adding from Competitive Intel shows "Added ✓" on Research page too
+
+## 2026-02-22 — Production Item Count in Sidebar Navigation
+
+Updated `src/ui/app.py` sidebar to show a live count badge on the Production nav entry:
+- Calls `get_production_item_count()` on each render to get total staged items
+- Displays "Production (N)" when N > 0, plain "Production" when empty
+- Count updates automatically when navigating between pages (Streamlit reruns on interaction)

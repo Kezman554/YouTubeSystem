@@ -13,6 +13,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.database.niches import get_all_niches
+from src.database.production_context import get_production_item_count
 
 
 # Page configuration
@@ -74,10 +75,18 @@ def render_sidebar():
             "⚡ Settings": "Settings"
         }
 
+        # Production item count for nav badge
+        try:
+            prod_count = get_production_item_count()
+        except Exception:
+            prod_count = 0
+
+        prod_label = f"🎬 Production ({prod_count})" if prod_count > 0 else "🎬 Production"
+
         # Phase 2 pages (disabled for now)
         phase_2_pages = {
+            prod_label: "Production",
             "💡 Ideation": "Ideation",
-            "🎬 Production": "Production",
             "🖼️ Asset Library": "Asset Library",
             "📈 My Analytics": "My Analytics",
             "🔭 Scout": "Scout"
