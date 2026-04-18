@@ -25,6 +25,7 @@ from src.database.production_context import (
     get_production_context,
     get_production_item_count,
 )
+from src.utils.obsidian_export import export_transcript_to_obsidian
 
 
 def embed_transcript(video: dict, transcript: str, channel_name: str) -> bool:
@@ -69,6 +70,27 @@ def embed_transcript(video: dict, transcript: str, channel_name: str) -> bool:
         return False
 
 
+def _export_to_obsidian_safe(
+    video: dict, transcript: str, channel_name: str, niche_name: str
+) -> None:
+    """Call Obsidian export; surface errors as caption, never block save."""
+    try:
+        path = export_transcript_to_obsidian(
+            video_title=video['title'],
+            channel_name=channel_name,
+            youtube_id=video['youtube_id'],
+            views=video.get('view_count'),
+            niche_name=niche_name,
+            transcript_text=transcript,
+        )
+        if path is None:
+            st.caption("Obsidian note already exists — skipped.")
+        else:
+            st.caption(f"Obsidian note written: {path}")
+    except Exception as e:
+        st.caption(f"Obsidian export failed (transcript still saved): {e}")
+
+
 def _get_added_chunk_ids() -> set:
     """Return set of chunk_ids already pinned to the production context."""
     ctx = get_production_context()
@@ -94,6 +116,10 @@ def _get_video_chunks(video_id: int) -> list:
 def render_videos_tab(niche_id: int):
     """Render the Videos tab with filtering, sorting, and transcript import."""
     st.subheader("Competitor Videos")
+
+    # Resolve niche name (used for Obsidian export frontmatter)
+    niche_row = get_niche(niche_id)
+    niche_name = niche_row['name'] if niche_row else ""
 
     # Get all videos for the niche
     all_videos = get_videos_by_niche(niche_id)
@@ -312,6 +338,7 @@ def render_videos_tab(niche_id: int):
                     if st.button("Update Transcript", key=f"update_transcript_{video['id']}"):
                         update_competitor_video(video['id'], transcript=edited_transcript, has_transcript=True)
                         st.success("Transcript updated!")
+                        _export_to_obsidian_safe(video, edited_transcript, channel_name, niche_name)
                         with st.spinner("Re-embedding transcript for search..."):
                             if embed_transcript(video, edited_transcript, channel_name):
                                 st.success("✅ Transcript re-embedded and searchable!")
@@ -387,6 +414,7 @@ def render_videos_tab(niche_id: int):
                             has_transcript=True
                         )
                         st.success("✅ Transcript saved!")
+                        _export_to_obsidian_safe(video, transcript_input.strip(), channel_name, niche_name)
                         with st.spinner("Embedding transcript for search..."):
                             if embed_transcript(video, transcript_input.strip(), channel_name):
                                 st.success("✅ Transcript embedded and searchable!")

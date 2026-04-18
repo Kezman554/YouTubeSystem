@@ -140,6 +140,23 @@ Added export preview and copy-to-clipboard to Production page footer:
 - `st.code` block with built-in copy button for clipboard access
 - Both update automatically as items are added/removed (Streamlit rerun)
 
+## 2026-04-18 — Obsidian Export on Transcript Save
+
+New module `src/utils/obsidian_export.py`:
+- `export_transcript_to_obsidian(video_title, channel_name, youtube_id, views, niche_name, transcript_text)`
+- `OBSIDIAN_BASE_PATH = C:\Dev\Alfred-Vault\2-projects\LOTR\Rival Transcripts`
+- Path: `{base}\{channel}\{video_title}.md` with invalid Windows filename chars (`:?/\"<>|`) stripped
+- Creates channel subdir with `mkdir(parents=True, exist_ok=True)`
+- Writes YAML frontmatter: `video_title`, `channel`, `youtube_id`, `views` (int), `niche`, `source: competitor_transcript`, `date_scraped` (YYYY-MM-DD)
+- Skips if file already exists (returns None, no overwrite)
+
+Wired into `src/ui/pages/competitive_intel.py`:
+- Resolves niche name once per render of Videos tab via `get_niche(niche_id)`
+- Added `_export_to_obsidian_safe()` helper — errors surface as `st.caption`, never block DB save or embedding
+- Called after successful DB save in both "Save Transcript" (new) and "Update Transcript" (edit) paths
+
+Verified via direct call in a tempdir: correct path, frontmatter matches spec, second call with same (channel, title) returns None (skipped).
+
 ## 2026-02-22 — Mark Videos as Unavailable in Competitive Intel
 
 Added `video_status` column to `competitor_videos` for flagging removed/private videos:
