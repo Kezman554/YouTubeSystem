@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
+import html
 import json
 
 from src.database.niches import get_niche
@@ -68,6 +69,59 @@ def embed_transcript(video: dict, transcript: str, channel_name: str) -> bool:
     except Exception as e:
         st.error(f"Embedding failed: {e}")
         return False
+
+
+def _copy_to_clipboard_button(label: str, value: str, key: str) -> None:
+    """Render a one-click copy button inside an HTML component iframe.
+
+    The button MUST live inside the iframe so the click provides user
+    activation to `navigator.clipboard.writeText`. Falls back to
+    `document.execCommand('copy')` via a hidden textarea if the async
+    clipboard API is unavailable (e.g. insecure context).
+    """
+    safe_val = json.dumps(value).replace("</", "<\\/")
+    label_html = html.escape(label)
+    st.components.v1.html(
+        f"""
+        <div style="display:flex;align-items:center;gap:0.5rem;font-family:'Source Sans Pro',sans-serif;">
+          <button id="b-{key}" style="
+              font-size:14px;padding:0.25rem 0.75rem;
+              border:1px solid rgba(49,51,63,0.2);border-radius:0.5rem;
+              background:#fff;cursor:pointer;">{label_html}</button>
+          <span id="m-{key}" style="font-size:13px;color:#09ab3b;"></span>
+        </div>
+        <script>
+          (function() {{
+            const val = {safe_val};
+            const btn = document.getElementById('b-{key}');
+            const msg = document.getElementById('m-{key}');
+            btn.addEventListener('click', async () => {{
+              try {{
+                if (navigator.clipboard && window.isSecureContext) {{
+                  await navigator.clipboard.writeText(val);
+                }} else {{
+                  const ta = document.createElement('textarea');
+                  ta.value = val;
+                  ta.style.position = 'fixed';
+                  ta.style.opacity = '0';
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(ta);
+                }}
+                msg.style.color = '#09ab3b';
+                msg.textContent = 'Copied!';
+                setTimeout(() => {{ msg.textContent = ''; }}, 1500);
+              }} catch (e) {{
+                msg.style.color = '#d43f3a';
+                msg.textContent = 'Copy failed';
+              }}
+            }});
+          }})();
+        </script>
+        """,
+        height=45,
+    )
 
 
 def _export_to_obsidian_safe(
@@ -287,28 +341,25 @@ def render_videos_tab(niche_id: int):
                 youtube_url = f"https://www.youtube.com/watch?v={video['youtube_id']}"
                 st.markdown(f"[🔗 Watch on YouTube]({youtube_url})")
 
-                # Copy buttons
-                btn_col1, btn_col2, _ = st.columns([1, 1, 2])
+                # One-click copy buttons — button lives inside the iframe so
+                # the click satisfies user activation for the clipboard API.
+                btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
-                    if st.button("📋 Copy Video ID", key=f"copy_{video['id']}"):
-                        st.session_state[f"copied_id_{video['id']}"] = True
-                    if st.session_state.get(f"copied_id_{video['id']}"):
-                        st.components.v1.html(
-                            f"<script>navigator.clipboard.writeText('{video['youtube_id']}');</script>",
-                            height=0
-                        )
-                        st.success("Copied!")
-                        del st.session_state[f"copied_id_{video['id']}"]
+                    _copy_to_clipboard_button(
+                        "📋 Copy Video ID",
+                        video['youtube_id'],
+                        key=f"id_{video['id']}",
+                    )
                 with btn_col2:
-                    if st.button("📋 Copy YouTube URL", key=f"copy_url_{video['id']}"):
-                        st.session_state[f"copied_url_{video['id']}"] = True
-                    if st.session_state.get(f"copied_url_{video['id']}"):
-                        st.components.v1.html(
-                            f"<script>navigator.clipboard.writeText('{youtube_url}');</script>",
-                            height=0
-                        )
-                        st.success("Copied!")
-                        del st.session_state[f"copied_url_{video['id']}"]
+                    _copy_to_clipboard_button(
+                        "📋 Copy YouTube URL",
+                        youtube_url,
+                        key=f"url_{video['id']}",
+                    )
+
+                # Selectable URL for manual copy (also has a hover copy icon).
+                st.caption("URL (select to copy manually):")
+                st.code(youtube_url, language=None)
 
             with col2:
                 st.metric("Likes", f"{video['like_count']:,}" if video['like_count'] else "N/A")

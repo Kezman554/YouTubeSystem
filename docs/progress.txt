@@ -140,6 +140,24 @@ Added export preview and copy-to-clipboard to Production page footer:
 - `st.code` block with built-in copy button for clipboard access
 - Both update automatically as items are added/removed (Streamlit rerun)
 
+## 2026-04-19 — Fix Copy Buttons on Competitive Intel Videos
+
+The "Copy Video ID" and "Copy YouTube URL" buttons were silently failing.
+Root cause: the old pattern clicked a Streamlit button, then on rerun
+injected a `<script>` into an iframe — the script ran on iframe load
+without user activation, so `navigator.clipboard.writeText` was blocked
+by the browser.
+
+Fix in `src/ui/pages/competitive_intel.py`:
+- New `_copy_to_clipboard_button(label, value, key)` helper renders the
+  button INSIDE the component iframe. Clicking it now produces user
+  activation in that context, so the clipboard API works.
+- Falls back to `document.execCommand('copy')` via a hidden textarea for
+  insecure contexts or older browsers.
+- Shows inline "Copied!" (green) or "Copy failed" (red) feedback for 1.5s.
+- Added a selectable `st.code(youtube_url)` block below the buttons as a
+  manual-copy fallback (monospace, full URL visible, hover copy icon).
+
 ## 2026-04-18 — Obsidian Export on Transcript Save
 
 New module `src/utils/obsidian_export.py`:
